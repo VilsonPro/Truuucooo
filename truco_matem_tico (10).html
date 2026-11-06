@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Truco Matemático Online</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .card-shadow {
+            box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.4), 0 2px 6px -2px rgba(0, 0, 0, 0.2);
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Pulse animation for current player's turn */
+        @keyframes turnPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+        }
+
+        .turn-active {
+            animation: turnPulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between select-none overflow-x-hidden">
+
+    <!-- Top Header / Bar -->
+    <header class="w-full bg-slate-900/90 border-b border-slate-800 p-3 sm:p-4 sticky top-0 z-40">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-2 sm:gap-3">
+                <span class="text-2xl sm:text-3xl">🎴</span>
+                <div>
+                    <h1 class="font-extrabold text-base sm:text-lg leading-tight bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">
+                        TRUCO MATEMÁTICO
+                    </h1>
+                    <span id="game-mode-badge" class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase">Modo: Vs BOT</span>
+                </div>
+            </div>
+
+            <!-- Online Room Info Header -->
+            <div id="room-code-display" class="hidden flex items-center gap-2 bg-emerald-950/80 border border-emerald-500/30 px-3 py-1.5 rounded-xl">
+                <span class="text-xs text-emerald-300 font-bold">SALA:</span>
+                <span id="current-room-code" class="font-mono text-emerald-400 font-black text-sm tracking-widest">======</span>
+                <button onclick="window.copyRoomLink()" class="ml-1 text-xs bg-emerald-800 hover:bg-emerald-700 text-emerald-100 px-2 py-0.5 rounded transition">
+                    📋 Copiar
+                </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="document.getElementById('multiplayer-modal').classList.remove('hidden')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm px-3 py-2 rounded-xl transition shadow-lg flex items-center gap-1.5">
+                    <span>🌐</span> <span class="hidden sm:inline">Jogar</span> Online
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Board Area -->
+    <main class="max-w-4xl w-full mx-auto p-2 sm:p-4 flex-1 flex flex-col justify-between">
+
+        <!-- Score Board -->
+        <div class="glass-panel p-3 sm:p-4 rounded-2xl flex items-center justify-between mb-2">
+            <div id="user-score-box" class="flex flex-col items-center flex-1">
+                <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider" id="user-name-label">Você</span>
+                <span id="user-score" class="text-2xl sm:text-3xl font-black text-amber-400">0</span>
+            </div>
+            
+            <div class="flex flex-col items-center px-4 border-x border-slate-800">
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Vale</span>
+                <span id="truco-value" class="text-xl sm:text-2xl font-black text-emerald-400">1</span>
+                <span class="text-[10px] text-slate-400">Ponto(s)</span>
+            </div>
+
+            <div id="opp-score-box" class="flex flex-col items-center flex-1">
+                <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider" id="opp-name-label">Oponente</span>
+                <span id="opp-score" class="text-2xl sm:text-3xl font-black text-rose-400">0</span>
+            </div>
+        </div>
+
+        <!-- Notification Banner -->
+        <div id="status-banner" class="text-center py-2 px-4 bg-slate-900/60 border border-slate-800 rounded-xl mb-3 text-xs sm:text-sm text-slate-300 font-semibold min-h-[36px] flex items-center justify-center">
+            Aguardando início do jogo...
+        </div>
+
+        <!-- Opponent Hand (Hidden Cards) -->
+        <div class="flex justify-center gap-2 sm:gap-3 my-2">
+            <div id="opp-hand" class="flex gap-2 sm:gap-3">
+                <!-- Opponent cards rendered dynamically -->
+            </div>
+        </div>
+
+        <!-- Table Center (Vira & Table Slots) -->
+        <div class="flex flex-col sm:flex-row items-center justify-around gap-4 my-4 bg-slate-900/40 p-3 sm:p-4 rounded-2xl border border-slate-800/80">
+            <!-- Vira Card Slot -->
+            <div class="flex flex-col items-center">
+                <span class="text-[10px] uppercase font-bold text-amber-300/80 mb-1 tracking-wider">Vira da Rodada</span>
+                <div id="vira-card-container" class="w-20 h-32 sm:w-24 sm:h-36 border-2 border-dashed border-amber-500/30 rounded-2xl flex items-center justify-center bg-slate-950/50">
+                    <!-- Vira Card Slot -->
+                </div>
+            </div>
+
+            <!-- Played Cards Slots -->
+            <div class="flex gap-6 items-center">
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] uppercase text-slate-400 mb-1">Sua Jogada</span>
+                    <div id="user-played-slot" class="w-20 h-32 sm:w-24 sm:h-36 border-2 border-dashed border-slate-700/60 rounded-2xl flex items-center justify-center bg-slate-950/40">
+                        <span class="text-xs text-slate-600 font-bold">Vazio</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] uppercase text-slate-400 mb-1">Jogada Oponente</span>
+                    <div id="bot-played-slot" class="w-20 h-32 sm:w-24 sm:h-36 border-2 border-dashed border-slate-700/60 rounded-2xl flex items-center justify-center bg-slate-950/40">
+                        <span class="text-xs text-slate-600 font-bold">Vazio</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Truco Control Action Buttons -->
+        <div class="flex justify-center gap-3 my-2">
+            <button id="btn-truco" onclick="window.handleTrucoClick()" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm sm:text-base px-6 py-2.5 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none">
+                🔥 TRUCO!
+            </button>
+        </div>
+
+        <!-- Player Hand -->
+        <div class="flex flex-col items-center gap-2 mt-2">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sua Mão</span>
+            <div id="user-hand" class="flex justify-center gap-2 sm:gap-4 min-h-[144px]">
+                <!-- Player cards rendered dynamically -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Multiplayer / Amigo -->
+    <div id="multiplayer-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+            <button onclick="document.getElementById('multiplayer-modal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl font-bold">
+                ✕
+            </button>
+            <h2 class="text-xl font-black text-amber-400 mb-1 flex items-center gap-2">
+                <span>🌐</span> Jogar com Amigo (Online)
+            </h2>
+            <p class="text-xs text-slate-400 mb-6">Crie uma sala nova para mandar o link para o seu amigo ou digite o código de uma sala aberta.</p>
+
+            <!-- Option 1: Create Room -->
+            <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50 mb-4">
+                <h3 class="text-sm font-bold text-slate-200 mb-2">Opção 1: Criar uma Nova Sala</h3>
+                <button onclick="window.createOnlineRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl transition text-sm shadow">
+                    ➕ Criar Nova Sala Online
+                </button>
+            </div>
+
+            <!-- Option 2: Join Room -->
+            <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50">
+                <h3 class="text-sm font-bold text-slate-200 mb-2">Opção 2: Entrar em Sala Existente</h3>
+                <div class="flex gap-2">
+                    <input id="room-code-input" type="text" placeholder="CÓDIGO (ex: A8X9P1)" class="uppercase bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-amber-300 font-mono font-bold w-full focus:outline-none focus:border-amber-400">
+                    <button id="btn-join-room" onclick="window.joinOnlineRoom()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition shrink-0">
+                        Entrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Truco Request Respond -->
+    <div id="truco-respond-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-amber-500/50 w-full max-w-sm rounded-2xl p-6 text-center shadow-2xl">
+            <span class="text-4xl block mb-2">🔥</span>
+            <h3 id="truco-modal-title" class="text-xl font-black text-amber-400 mb-2">PEDIRAM TRUCO!</h3>
+            <p id="truco-modal-desc" class="text-sm text-slate-300 mb-6">O oponente aumentou a aposta!</p>
+
+            <div class="flex flex-col gap-2">
+                <button onclick="window.respondTruco('accept')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl transition text-sm">
+                    ✅ Aceitar Desafio
+                </button>
+                <button onclick="window.respondTruco('raise')" id="btn-raise-truco" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl transition text-sm">
+                    ⚡ Aumentar ainda mais!
+                </button>
+                <button onclick="window.respondTruco('reject')" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 rounded-xl transition text-sm">
+                    🏳️ Correr (Fugir)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts (Modular Import Setup) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase Configuration Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'truco-matematico-default';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "demo-key",
+            authDomain: "demo.firebaseapp.com",
+            projectId: "demo-project",
+            storageBucket: "demo.appspot.com",
+            messagingSenderId: "000000000",
+            appId: "1:000000000:web:000000000"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let onlineRoomId = null;
+        let unsubscribeRoom = null;
+        let isOnlineMode = false;
+        let playerRole = 'p1'; // 'p1' (Criador) ou 'p2' (Convidado)
+
+        // Math Suits Configuration
+        const SUITS = [
+            { name: 'Paus', symbol: 'x', color: 'text-blue-400', border: 'border-blue-500', power: 4 },
+            { name: 'Copas', symbol: '+', color: 'text-rose-500', border: 'border-rose-500', power: 3 },
+            { name: 'Espadas', symbol: '÷', color: 'text-purple-400', border: 'border-purple-500', power: 2 },
+            { name: 'Ouros', symbol: '-', color: 'text-amber-400', border: 'border-amber-500', power: 1 }
+        ];
+
+        // Math Cards Data (Rank and Expressions)
+        const CARDS_DATA = [
+            { rank: 4, expr: '2²-0' },
+            { rank: 5, expr: '√25' },
+            { rank: 6, expr: '3!' },
+            { rank: 7, expr: '2³-1' },
+            { rank: 10, expr: '5x2' },
+            { rank: 11, expr: '11+0' },
+            { rank: 12, expr: '√144' },
+            { rank: 1, expr: '10⁰' },
+            { rank: 2, expr: '√4' },
+            { rank: 3, expr: 'log₁₀1000' }
+        ];
+
+        // Global Game Engine State
+        let gameState = {
+            userHand: [],
+            oppHand: [],
+            viraCard: null,
+            userPlayed: null,
+            oppPlayed: null,
+            userScore: 0,
+            oppScore: 0,
+            trucoValue: 1,
+            currentTurn: 'user', // 'user' ou 'opp'
+            roundWins: { user: 0, opp: 0 },
+            isTrucoPending: false
+        };
+
+        // Authenticate Player anonymously or with token
+        async function authenticateUser() {
+            return new Promise((resolve) => {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    signInWithCustomToken(auth, __initial_auth_token)
+                        .then((userCredential) => {
+                            currentUser = userCredential.user;
+                            resolve(currentUser);
+                        })
+                        .catch(() => {
+                            signInAnonymously(auth).then((cred) => {
+                                currentUser = cred.user;
+                                resolve(currentUser);
+                            });
+                        });
+                } else {
+                    signInAnonymously(auth).then((cred) => {
+                        currentUser = cred.user;
+                        resolve(currentUser);
+                    });
+                }
+            });
+        }
+
+        // Generate Full Math Truco Deck
+        function generateDeck() {
+            const deck = [];
+            let id = 1;
+
+            SUITS.forEach(suit => {
+                CARDS_DATA.forEach(cardData => {
+                    deck.push({
+                        id: id++,
+                        rank: cardData.rank,
+                        expr: cardData.expr,
+                        suitSymbol: suit.symbol,
+                        suitColor: suit.color,
+                        suitBorder: suit.border,
+                        suitPower: suit.power,
+                        basePower: cardData.rank,
+                        isJoker: false
+                    });
+                });
+            });
+
+            // Add Joker card (Chi-Squared)
+            deck.push({
+                id: 999,
+                rank: 99,
+                expr: 'JOKER',
+                suitSymbol: 'χ²',
+                suitColor: 'text-amber-300',
+                suitBorder: 'border-amber-400',
+                suitPower: 99,
+                basePower: 99,
+                isJoker: true
+            });
+
+            return deck.sort(() => Math.random() - 0.5);
+        }
+
+        function calculateManilhaPower(vira) {
+            if (!vira) return -1;
+            const rankOrder = [4, 5, 6, 7, 10, 11, 12, 1, 2, 3];
+            const idx = rankOrder.indexOf(vira.rank);
+            if (idx === -1) return -1;
+            return rankOrder[(idx + 1) % rankOrder.length];
+        }
+
+        function getCardStrength(card, vira) {
+            if (!card) return 0;
+            if (card.isJoker) return 999;
+            const manilhaPower = calculateManilhaPower(vira);
+            if (card.basePower === manilhaPower) {
+                return 100 + card.suitPower;
+            }
+            return card.basePower;
+        }
+
+        // Render Individual HTML Card (Diagonals Layout)
+        function renderCardHTML(card, isHidden = false, onClickHandler = '') {
+            if (!card) return '<div class="w-20 h-32 sm:w-24 sm:h-36 border-2 border-dashed border-slate-800 rounded-2xl"></div>';
+            
+            if (isHidden) {
+                return `
+                    <div class="w-20 h-32 sm:w-24 sm:h-36 bg-gradient-to-br from-indigo-950 to-slate-900 border-2 border-indigo-500/40 rounded-2xl card-shadow flex items-center justify-center">
+                        <span class="text-3xl text-indigo-400">🎴</span>
+                    </div>
+                `;
+            }
+
+            const centerSymbol = card.isJoker ? 'χ²' : card.suitSymbol;
+            const cornerLabel = card.isJoker ? 'JOKER' : card.expr;
+
+            return `
+                <div onclick="${onClickHandler}" class="w-20 h-32 sm:w-24 sm:h-36 bg-slate-900 border-2 border-slate-700 rounded-2xl p-1.5 relative flex flex-col justify-between cursor-pointer hover:border-amber-400 hover:-translate-y-2 transition-all duration-200 card-shadow select-none overflow-hidden">
+                    <!-- Top-Left Corner Diagonal -->
+                    <div class="absolute top-1.5 left-2 flex flex-col items-start leading-none ${card.suitColor} z-10 pointer-events-none">
+                        <span class="text-[10px] sm:text-[11px] font-mono font-black tracking-tighter">${cornerLabel}</span>
+                        <span class="text-[12px] sm:text-[14px] font-bold leading-none mt-0.5">${card.suitSymbol}</span>
+                    </div>
+
+                    <!-- Center Large Suit / Joker Symbol -->
+                    <div class="absolute inset-0 flex items-center justify-center ${card.suitColor} text-5xl sm:text-6xl font-black opacity-90 pointer-events-none drop-shadow-md">
+                        ${centerSymbol}
+                    </div>
+
+                    <!-- Bottom-Right Corner Diagonal (Inverted) -->
+                    <div class="absolute bottom-1.5 right-2 flex flex-col items-end leading-none ${card.suitColor} rotate-180 z-10 pointer-events-none">
+                        <span class="text-[10px] sm:text-[11px] font-mono font-black tracking-tighter">${cornerLabel}</span>
+                        <span class="text-[12px] sm:text-[14px] font-bold leading-none mt-0.5">${card.suitSymbol}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Entire Game Screen UI
+        function updateUI() {
+            // User Hand
+            const userHandContainer = document.getElementById('user-hand');
+            userHandContainer.innerHTML = gameState.userHand
+                .map((card, idx) => renderCardHTML(card, false, `window.playCard(${idx})`))
+                .join('');
+
+            // Opponent Hand
+            const oppHandContainer = document.getElementById('opp-hand');
+            oppHandContainer.innerHTML = gameState.oppHand
+                .map((card) => renderCardHTML(card, true))
+                .join('');
+
+            // Vira Card
+            const viraContainer = document.getElementById('vira-card-container');
+            viraContainer.innerHTML = gameState.viraCard ? renderCardHTML(gameState.viraCard) : '<span class="text-xs text-slate-600 font-bold">Vazio</span>';
+
+            // Played Cards
+            document.getElementById('user-played-slot').innerHTML = gameState.userPlayed ? renderCardHTML(gameState.userPlayed) : '<span class="text-xs text-slate-600 font-bold">Vazio</span>';
+            document.getElementById('bot-played-slot').innerHTML = gameState.oppPlayed ? renderCardHTML(gameState.oppPlayed) : '<span class="text-xs text-slate-600 font-bold">Vazio</span>';
+
+            // Scores and Status
+            document.getElementById('user-score').innerText = gameState.userScore;
+            document.getElementById('opp-score').innerText = gameState.oppScore;
+            document.getElementById('truco-value').innerText = gameState.trucoValue;
+
+            // Turn Indicator
+            const userScoreBox = document.getElementById('user-score-box');
+            const oppScoreBox = document.getElementById('opp-score-box');
+            
+            if (gameState.currentTurn === 'user') {
+                userScoreBox.classList.add('turn-active');
+                oppScoreBox.classList.remove('turn-active');
+            } else {
+                oppScoreBox.classList.add('turn-active');
+                userScoreBox.classList.remove('turn-active');
+            }
+        }
+
+        // Start Bot Local Game
+        window.startBotGame = function() {
+            isOnlineMode = false;
+            document.getElementById('game-mode-badge').innerText = 'Modo: Vs BOT';
+            document.getElementById('room-code-display').classList.add('hidden');
+            document.getElementById('user-name-label').innerText = 'Você';
+            document.getElementById('opp-name-label').innerText = 'BOT';
+
+            const deck = generateDeck();
+            gameState = {
+                userHand: [deck[0], deck[1], deck[2]],
+                oppHand: [deck[3], deck[4], deck[5]],
+                viraCard: deck[6],
+                userPlayed: null,
+                oppPlayed: null,
+                userScore: 0,
+                oppScore: 0,
+                trucoValue: 1,
+                currentTurn: 'user',
+                roundWins: { user: 0, opp: 0 },
+                isTrucoPending: false
+            };
+
+            document.getElementById('status-banner').innerText = 'Sua vez de jogar!';
+            updateUI();
+        };
+
+        // Play Card Logic
+        window.playCard = function(cardIndex) {
+            if (gameState.currentTurn !== 'user') return;
+            if (!gameState.userHand[cardIndex]) return;
+
+            const card = gameState.userHand.splice(cardIndex, 1)[0];
+            gameState.userPlayed = card;
+            updateUI();
+
+            if (!isOnlineMode) {
+                // BOT Turn Execution
+                if (!gameState.oppPlayed) {
+                    gameState.currentTurn = 'opp';
+                    document.getElementById('status-banner').innerText = 'O BOT está pensando...';
+                    setTimeout(() => {
+                        const botCardIndex = Math.floor(Math.random() * gameState.oppHand.length);
+                        gameState.oppPlayed = gameState.oppHand.splice(botCardIndex, 1)[0];
+                        evaluateRoundWinner();
+                    }, 1000);
+                } else {
+                    evaluateRoundWinner();
+                }
+            } else {
+                // Online Sync Execution
+                syncOnlineGameState();
+            }
+        };
+
+        // Evaluate Round Winner Logic
+        function evaluateRoundWinner() {
+            const userPower = getCardStrength(gameState.userPlayed, gameState.viraCard);
+            const oppPower = getCardStrength(gameState.oppPlayed, gameState.viraCard);
+
+            let resultText = '';
+            if (userPower > oppPower) {
+                gameState.roundWins.user++;
+                resultText = 'Você venceu a rodada!';
+                gameState.currentTurn = 'user';
+            } else if (oppPower > userPower) {
+                gameState.roundWins.opp++;
+                resultText = 'Oponente venceu a rodada!';
+                gameState.currentTurn = 'opp';
+            } else {
+                resultText = 'Rodada Empatada!';
+            }
+
+            document.getElementById('status-banner').innerText = resultText;
+            updateUI();
+
+            setTimeout(() => {
+                gameState.userPlayed = null;
+                gameState.oppPlayed = null;
+
+                // Check Hand Winner
+                if (gameState.roundWins.user >= 2) {
+                    gameState.userScore += gameState.trucoValue;
+                    resetRound('Você ganhou a mão!');
+                } else if (gameState.roundWins.opp >= 2) {
+                    gameState.oppScore += gameState.trucoValue;
+                    resetRound('Oponente ganhou a mão!');
+                } else {
+                    updateUI();
+                    if (!isOnlineMode && gameState.currentTurn === 'opp') {
+                        setTimeout(() => {
+                            const botCardIndex = Math.floor(Math.random() * gameState.oppHand.length);
+                            gameState.oppPlayed = gameState.oppHand.splice(botCardIndex, 1)[0];
+                            updateUI();
+                        }, 800);
+                    }
+                }
+            }, 1600);
+        }
+
+        // Reset Round after scoring
+        function resetRound(message) {
+            document.getElementById('status-banner').innerText = message;
+            const deck = generateDeck();
+            gameState.userHand = [deck[0], deck[1], deck[2]];
+            gameState.oppHand = [deck[3], deck[4], deck[5]];
+            gameState.viraCard = deck[6];
+            gameState.userPlayed = null;
+            gameState.oppPlayed = null;
+            gameState.trucoValue = 1;
+            gameState.roundWins = { user: 0, opp: 0 };
+            gameState.currentTurn = 'user';
+
+            setTimeout(() => {
+                updateUI();
+            }, 1200);
+        }
+
+        // Handle Truco Request Button
+        window.handleTrucoClick = function() {
+            if (gameState.trucoValue >= 12) return;
+            if (!isOnlineMode) {
+                const modal = document.getElementById('truco-respond-modal');
+                document.getElementById('truco-modal-title').innerText = 'TRUCO PEDIDO!';
+                document.getElementById('truco-modal-desc').innerText = `Deseja aumentar a aposta para ${gameState.trucoValue + 3} pontos?`;
+                modal.classList.remove('hidden');
+            }
+        };
+
+        // Respond to Truco
+        window.respondTruco = function(action) {
+            document.getElementById('truco-respond-modal').classList.add('hidden');
+            if (action === 'accept') {
+                gameState.trucoValue += 2;
+                document.getElementById('status-banner').innerText = `Truco Aceito! Mão valendo ${gameState.trucoValue} pontos!`;
+            } else if (action === 'reject') {
+                gameState.oppScore += gameState.trucoValue;
+                resetRound('Oponente correu do Truco!');
+            }
+            updateUI();
+        };
+
+        // ONLINE MULTIPLAYER LOGIC
+        window.createOnlineRoom = async function() {
+            await authenticateUser();
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            onlineRoomId = code;
+            isOnlineMode = true;
+            playerRole = 'p1';
+
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', onlineRoomId);
+            const deck = generateDeck();
+
+            const initialRoomData = {
+                code: code,
+                status: 'waiting',
+                p1Id: currentUser.uid,
+                p2Id: null,
+                p1Hand: [deck[0], deck[1], deck[2]],
+                p2Hand: [deck[3], deck[4], deck[5]],
+                viraCard: deck[6],
+                p1Played: null,
+                p2Played: null,
+                p1Score: 0,
+                p2Score: 0,
+                trucoValue: 1,
+                currentTurn: 'p1'
+            };
+
+            await setDoc(roomRef, initialRoomData);
+
+            document.getElementById('game-mode-badge').innerText = 'Modo: Online (Criador)';
+            document.getElementById('room-code-display').classList.remove('hidden');
+            document.getElementById('current-room-code').innerText = code;
+            document.getElementById('multiplayer-modal').classList.add('hidden');
+            document.getElementById('status-banner').innerText = 'Aguardando seu amigo entrar na sala...';
+
+            subscribeToOnlineRoom(roomRef);
+        };
+
+        window.joinOnlineRoom = async function() {
+            const codeInput = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (!codeInput) return;
+
+            const btnJoin = document.getElementById('btn-join-room');
+            if (btnJoin) btnJoin.innerText = 'Entrando...';
+
+            await authenticateUser();
+            onlineRoomId = codeInput;
+            isOnlineMode = true;
+            playerRole = 'p2';
+
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', onlineRoomId);
+            
+            try {
+                const snapshot = await getDoc(roomRef);
+                if (snapshot.exists()) {
+                    await updateDoc(roomRef, {
+                        p2Id: currentUser.uid,
+                        status: 'playing'
+                    });
+
+                    document.getElementById('game-mode-badge').innerText = 'Modo: Online (Convidado)';
+                    document.getElementById('room-code-display').classList.remove('hidden');
+                    document.getElementById('current-room-code').innerText = onlineRoomId;
+                    document.getElementById('multiplayer-modal').classList.add('hidden');
+
+                    subscribeToOnlineRoom(roomRef);
+                } else {
+                    alert('Sala não encontrada! Verifique o código digitado.');
+                }
+            } catch (err) {
+                console.error("Erro ao entrar na sala:", err);
+            } finally {
+                if (btnJoin) btnJoin.innerText = 'Entrar';
+            }
+        };
+
+        function subscribeToOnlineRoom(roomRef) {
+            if (unsubscribeRoom) unsubscribeRoom();
+
+            unsubscribeRoom = onSnapshot(roomRef, (docSnap) => {
+                if (!docSnap.exists()) return;
+                const data = docSnap.data();
+
+                if (playerRole === 'p1') {
+                    gameState.userHand = data.p1Hand || [];
+                    gameState.oppHand = data.p2Hand || [];
+                    gameState.userPlayed = data.p1Played;
+                    gameState.oppPlayed = data.p2Played;
+                    gameState.userScore = data.p1Score || 0;
+                    gameState.oppScore = data.p2Score || 0;
+                    gameState.currentTurn = data.currentTurn === 'p1' ? 'user' : 'opp';
+                } else {
+                    gameState.userHand = data.p2Hand || [];
+                    gameState.oppHand = data.p1Hand || [];
+                    gameState.userPlayed = data.p2Played;
+                    gameState.oppPlayed = data.p1Played;
+                    gameState.userScore = data.p2Score || 0;
+                    gameState.oppScore = data.p1Score || 0;
+                    gameState.currentTurn = data.currentTurn === 'p2' ? 'user' : 'opp';
+                }
+
+                gameState.viraCard = data.viraCard;
+                gameState.trucoValue = data.trucoValue || 1;
+
+                if (data.status === 'waiting') {
+                    document.getElementById('status-banner').innerText = 'Aguardando o segundo jogador entrar...';
+                } else {
+                    document.getElementById('status-banner').innerText = gameState.currentTurn === 'user' ? 'Sua vez de jogar!' : 'Vez do seu amigo...';
+                }
+
+                updateUI();
+            }, (err) => {
+                console.error("Erro ao escutar dados da sala:", err);
+            });
+        }
+
+        async function syncOnlineGameState() {
+            if (!onlineRoomId) return;
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', onlineRoomId);
+            
+            const payload = playerRole === 'p1' ? {
+                p1Hand: gameState.userHand,
+                p1Played: gameState.userPlayed,
+                currentTurn: 'p2'
+            } : {
+                p2Hand: gameState.userHand,
+                p2Played: gameState.userPlayed,
+                currentTurn: 'p1'
+            };
+
+            await updateDoc(roomRef, payload);
+        }
+
+        window.copyRoomLink = function() {
+            const code = document.getElementById('current-room-code').innerText;
+            const tempInput = document.createElement('input');
+            tempInput.value = code;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            alert(`Código da Sala ${code} copiado com sucesso!`);
+        };
+
+        // Window Onload Initialization
+        window.onload = function() {
+            window.startBotGame();
+
+            // Check URL hash for automatic room join
+            if (window.location.hash) {
+                const codeHash = window.location.hash.substring(1).toUpperCase();
+                if (codeHash) {
+                    document.getElementById('room-code-input').value = codeHash;
+                    document.getElementById('multiplayer-modal').classList.remove('hidden');
+                }
+            }
+        };
+    </script>
+</body>
+</html>
